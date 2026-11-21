@@ -87,7 +87,7 @@ def sky(img):
     d = ImageDraw.Draw(img)
     # deco banded clouds: long flat lozenges in warm tints
     bands = [(600, 1420, 52, "#f3b98f", 150), (700, 1300, 40, "#f6c79c", 140),
-             (845, 980, 30, "#f8d3a8", 120), (380, 700, 22, "#e7a08a", 90)]
+             (845, 980, 30, "#f8d3a8", 120)]
     for y, length, th, col, a in bands:
         x0 = rng.randint(-200, 500)
         for k in range(2):
@@ -96,9 +96,13 @@ def sky(img):
     # small high clouds
     for _ in range(9):
         x = rng.randint(0, S)
-        y = rng.randint(150, 650)
+        y = rng.randint(560, 780)
         L = rng.randint(120, 340)
         d.rounded_rectangle([x, y, x + L, y + 14], radius=7, fill=hexc("#f9dcb8", 90))
+    # a few gulls heading home over the bay
+    for gx, gy, gs in [(1180, 640, 26), (1260, 600, 20), (1330, 660, 16), (900, 700, 14), (1500, 560, 18)]:
+        d.arc([gx - gs, gy - gs // 2, gx, gy + gs // 2], 200, 340, fill=hexc(NAVY, 220), width=5)
+        d.arc([gx, gy - gs // 2, gx + gs, gy + gs // 2], 200, 340, fill=hexc(NAVY, 220), width=5)
 
 
 def sun(img):
@@ -186,6 +190,22 @@ def island(img):
     # stone body: gradient from sun-lit apricot rim (right/top) to deep teal stone
     shade = vgrad(S, S, [(0.0, STONE), (0.42, STONE), (0.62, DEEP), (1.0, NAVY)])
     paste_fill(img, m, shade)
+    # warm sunset light washing over the crown of the back, fading toward the belly
+    light = Image.new("L", (S, S), 0)
+    ImageDraw.Draw(light).ellipse([700, 560, 1700, 1180], fill=150)
+    light = ImageChops.multiply(light.filter(ImageFilter.GaussianBlur(120)), m)
+    paste_fill(img, light, hexc("#c98a6e"))
+    # weathered stone: soft lichen and barnacle patches
+    rr = random.Random(21)
+    tex = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    td = ImageDraw.Draw(tex)
+    for _ in range(260):
+        x = rr.randint(230, 1600)
+        y = rr.randint(680, HZ)
+        r = rr.randint(6, 30)
+        col = rr.choice(["#4d7283", "#28465a", "#5e8291", "#203a4e"])
+        td.ellipse([x - r, y - r * 0.6, x + r, y + r * 0.6], fill=hexc(col, 38))
+    img.paste(tex, (0, 0), ImageChops.multiply(tex.getchannel("A"), m))
     # rim light on the sun side: offset mask difference
     off = ImageChops.offset(m, -16, 14)
     rim = ImageChops.subtract(m, off)
@@ -271,6 +291,34 @@ def village(img, body_mask):
                     fy = y - rr.randint(10, 2 * r)
                     d.ellipse([fx, fy, fx + 7, fy + 7], fill=hexc("#f4d03f"))
             x += w + rr.randint(8, 30)
+    # skyline on the crown, drawn unclipped so it stands above the whale's outline
+    crown = bezier((560, 700), (800, 650), (1060, 700), (1250, 820), 200)
+
+    def crown_y(px):
+        return min(crown, key=lambda p: abs(p[0] - px))[1]
+
+    sky_layer = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d2 = ImageDraw.Draw(sky_layer)
+    # cypresses standing along the upper terraces
+    for cx in (760, 905, 1035, 1160):
+        cy = crown_y(cx) + 24
+        d2.polygon([(cx - 13, cy), (cx, cy - 92), (cx + 13, cy)], fill=hexc("#1f4a3a"))
+        d2.polygon([(cx, cy), (cx, cy - 92), (cx + 13, cy)], fill=hexc("#2c6049"))
+    # a domed chapel with a bell tower on the crown of the back
+    hx = 980
+    hy = crown_y(hx) + 26
+    d2.rectangle([hx - 70, hy - 70, hx + 70, hy], fill=hexc(CREAM))
+    d2.rectangle([hx + 20, hy - 70, hx + 70, hy], fill=hexc("#e8c9a6"))
+    d2.pieslice([hx - 62, hy - 140, hx + 62, hy - 14], 180, 360, fill=hexc("#3f8fb0"))
+    d2.pieslice([hx - 10, hy - 140, hx + 62, hy - 14], 270, 360, fill=hexc("#2f6f8e"))
+    d2.line([hx, hy - 140, hx, hy - 170], fill=hexc(NAVY), width=5)
+    d2.line([hx - 10, hy - 160, hx + 10, hy - 160], fill=hexc(NAVY), width=4)
+    d2.rectangle([hx + 78, hy - 150, hx + 118, hy], fill=hexc(CREAM))
+    d2.rectangle([hx + 100, hy - 150, hx + 118, hy], fill=hexc("#e8c9a6"))
+    d2.polygon([(hx + 72, hy - 150), (hx + 98, hy - 196), (hx + 124, hy - 150)], fill=hexc(TERRA))
+    d2.rectangle([hx + 88, hy - 132, hx + 108, hy - 104], fill=hexc("#ffcd6b"))
+    for k in range(3):
+        d2.rectangle([hx - 50 + k * 40, hy - 52, hx - 34 + k * 40, hy - 22], fill=hexc("#ffcd6b"))
     # zig-zag stairway down to the harbour
     sx, sy = 1180, 860
     for k in range(9):
@@ -280,6 +328,7 @@ def village(img, body_mask):
         sx, sy = nx, ny
     clip = ImageChops.multiply(layer.getchannel("A"), body_mask)
     img.paste(layer, (0, 0), clip)
+    img.alpha_composite(sky_layer)
     # harbour quay on the water at the island's foot
     dd = ImageDraw.Draw(img)
     dd.rectangle([1080, HZ - 14, 1560, HZ + 10], fill=hexc("#d9b48c"))
@@ -395,9 +444,23 @@ def foreground(img):
             r = rr.random() ** 0.6
             x = cx + math.cos(a) * rx * r
             y = cy + math.sin(a) * ry * r
-            s = rr.randint(22, 46)
-            col = LEAF if rr.random() < 0.38 else rr.choice([BOUG, "#e8679a", "#c43b6e", "#f08bb0"])
-            d.ellipse([x - s, y - s * 0.8, x + s, y + s * 0.8], fill=hexc(col))
+            if rr.random() < 0.36:
+                # pointed leaf at a random angle
+                s = rr.randint(18, 34)
+                ang = rr.uniform(0, math.pi)
+                dx, dy = math.cos(ang) * s, math.sin(ang) * s
+                nx, ny = -dy * 0.38, dx * 0.38
+                d.polygon([(x - dx, y - dy), (x + nx, y + ny), (x + dx, y + dy), (x - nx, y - ny)],
+                          fill=hexc(rr.choice([LEAF, "#24503f", "#3d6e52"])))
+            else:
+                # papery three-petal bract cluster with a pale centre
+                s = rr.randint(10, 20)
+                col = rr.choice([BOUG, "#e8679a", "#c43b6e", "#f08bb0", "#d9487f"])
+                for k in range(3):
+                    a2 = k * 2.09 + rr.random()
+                    px, py = x + math.cos(a2) * s * 0.7, y + math.sin(a2) * s * 0.7
+                    d.ellipse([px - s, py - s * 0.8, px + s, py + s * 0.8], fill=hexc(col))
+                d.ellipse([x - 3, y - 3, x + 3, y + 3], fill=hexc("#fbe3ec"))
 
     # left vine climbing the frame edge, right corner bush
     bloom(70, 1650, 210, 380, 420)
@@ -419,12 +482,16 @@ def title(img):
     total = sum(widths) + track * (len(word) - 1)
     x = (S - total) / 2
     y = 70
-    # shadow then letters
-    for dx, dy, col in [(10, 12, hexc("#16263a", 200)), (0, 0, hexc(CREAM))]:
-        xx = x
-        for ch, w in zip(word, widths):
-            d.text((xx + dx, y + dy), ch, font=big, fill=col)
-            xx += w + track
+    # letters as a mask: navy drop shadow, then a cream-to-apricot sunset fill
+    letters = Image.new("L", (S, S), 0)
+    ld = ImageDraw.Draw(letters)
+    xx = x
+    for ch, w in zip(word, widths):
+        ld.text((xx, y), ch, font=big, fill=255)
+        xx += w + track
+    paste_fill(img, ImageChops.offset(letters, 10, 12), hexc("#16263a", 220))
+    fill = vgrad(S, S, [(0.0, "#fff6e2"), (0.12, CREAM), (0.20, "#f6c48f"), (1.0, "#f6c48f")])
+    paste_fill(img, letters, fill)
     sub = "ISLE  OF  THE  SLEEPING  WHALE"
     sw = d.textlength(sub, font=small)
     sy = y + 370
