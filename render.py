@@ -74,7 +74,7 @@ CREAM = "#f6ead2"
 CORAL = "#e07a5f"
 TERRA = "#c75b3a"
 SUN = "#fff1c9"
-STONE = "#35566a"
+STONE = "#3e6478"
 STONE_LIT = "#e29a6f"
 LEAF = "#2f5d4a"
 BOUG = "#d9487f"
@@ -140,7 +140,7 @@ def mountains(img):
 
 
 def sea(img, sun_x):
-    g = vgrad(S, S - HZ, [(0, "#5fb3ad"), (0.35, TEAL), (1.0, "#15475a")])
+    g = vgrad(S, S - HZ, [(0, "#74c6bb"), (0.35, "#3d9e9e"), (1.0, "#1d5e6d")])
     img.paste(g, (0, HZ))
     d = ImageDraw.Draw(img)
     # glitter path below the sun, widening toward the viewer
