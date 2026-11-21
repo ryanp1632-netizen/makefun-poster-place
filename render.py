@@ -74,7 +74,7 @@ CREAM = "#f6ead2"
 CORAL = "#e07a5f"
 TERRA = "#c75b3a"
 SUN = "#fff1c9"
-STONE = "#3e6478"
+STONE = "#527489"
 STONE_LIT = "#e29a6f"
 LEAF = "#2f5d4a"
 BOUG = "#d9487f"
@@ -111,6 +111,17 @@ def sun(img):
     ImageDraw.Draw(glow).ellipse([cx - 520, cy - 520, cx + 520, cy + 520], fill=120)
     glow = glow.filter(ImageFilter.GaussianBlur(160))
     paste_fill(img, glow, hexc("#ffe3ae"))
+    # soft sun rays fanning up into the sky (kept clear of the title)
+    rays = Image.new("L", (S, S), 0)
+    rd = ImageDraw.Draw(rays)
+    for ang in range(196, 345, 13):
+        a0, a1 = math.radians(ang - 2.2), math.radians(ang + 2.2)
+        L = 1500
+        rd.polygon([(cx, cy), (cx + L * math.cos(a0), cy + L * math.sin(a0)),
+                    (cx + L * math.cos(a1), cy + L * math.sin(a1))], fill=72)
+    ImageDraw.Draw(rays).rectangle([0, 0, S, 560], fill=0)
+    rays = rays.filter(ImageFilter.GaussianBlur(26))
+    paste_fill(img, rays, hexc("#fff0cf"))
     m = Image.new("L", (S, S), 0)
     ImageDraw.Draw(m).ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
     # sun sits on the horizon: clip below it
@@ -192,7 +203,7 @@ def island(img):
     paste_fill(img, m, shade)
     # warm sunset light washing over the crown of the back, fading toward the belly
     light = Image.new("L", (S, S), 0)
-    ImageDraw.Draw(light).ellipse([700, 560, 1700, 1180], fill=150)
+    ImageDraw.Draw(light).ellipse([560, 520, 1760, 1220], fill=200)
     light = ImageChops.multiply(light.filter(ImageFilter.GaussianBlur(120)), m)
     paste_fill(img, light, hexc("#c98a6e"))
     # weathered stone: soft lichen and barnacle patches
@@ -327,7 +338,15 @@ def village(img, body_mask):
         d.line([sx, sy, nx, ny], fill=hexc(CREAM, 230), width=7)
         sx, sy = nx, ny
     clip = ImageChops.multiply(layer.getchannel("A"), body_mask)
+    # dusk: lit windows bleed a warm glow into the terraces
+    lit = Image.new("L", (S, S), 0)
+    win = np.asarray(layer.convert("RGB"), np.int16)
+    yellow = (win[:, :, 0] > 230) & (win[:, :, 1] > 160) & (win[:, :, 2] < 130)
+    lit.paste(Image.fromarray((yellow * 255).astype(np.uint8), "L"))
+    lit = ImageChops.multiply(lit, body_mask).filter(ImageFilter.GaussianBlur(9))
+    lit = lit.point(lambda v: min(255, v * 3))
     img.paste(layer, (0, 0), clip)
+    paste_fill(img, lit.point(lambda v: v * 0.55), hexc("#ffc46a"))
     img.alpha_composite(sky_layer)
     # harbour quay on the water at the island's foot
     dd = ImageDraw.Draw(img)
@@ -506,6 +525,10 @@ def finish(img):
     gen = np.random.default_rng(42)
     grain = gen.normal(0, 7.5, (S, S, 1))
     arr = arr + grain
+    # gouache / lithograph ink: slow blotchy variation in how densely each colour printed
+    blot = Image.fromarray((gen.normal(0, 1, (48, 48)) * 40 + 128).clip(0, 255).astype(np.uint8), "L")
+    blot = np.asarray(blot.resize((S, S), Image.BICUBIC).filter(ImageFilter.GaussianBlur(30)), np.float32)
+    arr *= (1 + 0.045 * (blot - 128) / 40)[:, :, None]
     yy, xx = np.mgrid[0:S, 0:S]
     r = np.sqrt(((xx - S / 2) / (S / 2)) ** 2 + ((yy - S / 2) / (S / 2)) ** 2)
     arr *= (1 - 0.16 * np.clip(r - 0.55, 0, 1) ** 1.5)[:, :, None]
